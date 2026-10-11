@@ -7,6 +7,6 @@ crons = ["*/10 * * * *"]
 
 [vars]
 GITHUB_OWNER = "L1z2y2405"
-GITHUB_REPO = "tarkov-bot"
+GITHUB_REPO = "discord-notify-bot"
 GITHUB_WORKFLOW = "tarkov-discord-notifier.yml"
 GITHUB_REF = "main"

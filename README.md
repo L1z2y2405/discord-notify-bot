@@ -1,4 +1,4 @@
-# tarkov-discord-notifier
+# discord-notify-bot
 
 Polls X accounts listed in a shared Google Doc and forwards new posts to Discord via webhook.
 
@@ -102,12 +102,12 @@ npx wrangler deploy
 `secret put` asks for a value: paste the PAT there. The argument is the secret **name** (`GITHUB_DISPATCH_TOKEN`), not the token itself.
 
 3. Confirm deploy output includes `schedule: */10 * * * *`.
-4. Check the Actions tab within 10 minutes for a `Tarkov Discord Notifier` run triggered by `workflow_dispatch`.
+4. Check the Actions tab within 10 minutes for a Discord notifier run triggered by `workflow_dispatch`.
 
 Worker env (in `wrangler.toml`):
 
 - `GITHUB_OWNER`: `L1z2y2405`
-- `GITHUB_REPO`: `tarkov-bot`
+- `GITHUB_REPO`: `discord-notify-bot` (old name `tarkov-bot` still redirects)
 - `GITHUB_WORKFLOW`: `tarkov-discord-notifier.yml`
 - `GITHUB_REF`: `main`
 

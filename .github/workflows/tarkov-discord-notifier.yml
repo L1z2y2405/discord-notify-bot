@@ -1,10 +1,10 @@
-name: Tarkov Discord Notifier
+name: Discord Notifier
 
 on:
   workflow_dispatch:
 
 concurrency:
-  group: tarkov-discord-notifier
+  group: discord-notifier
   cancel-in-progress: true
 
 permissions:
