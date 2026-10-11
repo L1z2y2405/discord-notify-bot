@@ -6,7 +6,6 @@ from typing import NoReturn
 
 from config import Settings
 from discord_webhook import DiscordClient
-from models import Post
 from scheduler import NotifierScheduler
 from storage import Storage
 from twitter import TwitterClient
@@ -38,6 +37,7 @@ async def main() -> None:
         discord_client=discord_client,
         storage=storage,
         check_interval_seconds=settings.check_interval_seconds,
+        google_doc_id=settings.google_doc_id,
         logger=logger,
     )
     if settings.run_once:

@@ -41,6 +41,7 @@ def _parse_int(value: str | None, default: int) -> int:
 class Settings:
     discord_webhook_url: str
     check_interval_seconds: int
+    google_doc_id: str
     twitter_username: str
     headless: bool
     retry_attempts: int
@@ -51,11 +52,17 @@ class Settings:
     def from_env(cls) -> "Settings":
         root_dir = Path(__file__).resolve().parent
         _load_dotenv(root_dir / ".env")
+        google_doc = (
+            os.getenv("GOOGLE_DOC_ID", "").strip()
+            or os.getenv("GOOGLE_DOC_URL", "").strip()
+            or "1l_zDCeJY0KAOoD6K9xzCEY6x9ALHKR1G_CBz3O_Gopc"
+        )
         return cls(
             discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", "").strip(),
             check_interval_seconds=_parse_int(
-                os.getenv("CHECK_INTERVAL_SECONDS"), 300
+                os.getenv("CHECK_INTERVAL_SECONDS"), 600
             ),
+            google_doc_id=google_doc,
             twitter_username=os.getenv("TWITTER_USERNAME", "tarkov").strip(),
             headless=_parse_bool(os.getenv("HEADLESS"), True),
             retry_attempts=_parse_int(os.getenv("RETRY_ATTEMPTS"), 3),

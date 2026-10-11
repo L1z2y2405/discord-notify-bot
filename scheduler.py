@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import logging
+import os
 import subprocess
 from pathlib import Path
 
 from discord_webhook import DiscordClient
-from models import StoredState
+from sources import SourcesError, fetch_handles
 from storage import Storage
 from twitter import TwitterClient
 from utils import retry_async
@@ -20,15 +20,16 @@ class NotifierScheduler:
         discord_client: DiscordClient,
         storage: Storage,
         check_interval_seconds: int,
+        google_doc_id: str,
         logger: logging.Logger,
     ) -> None:
         self._twitter_client = twitter_client
         self._discord_client = discord_client
         self._storage = storage
         self._check_interval_seconds = check_interval_seconds
+        self._google_doc_id = google_doc_id
         self._logger = logger
         self._repo_root = Path(__file__).resolve().parent
-        self._seen_post_ids: set[str] = set()
 
     async def run(self) -> None:
         while True:
@@ -36,36 +37,55 @@ class NotifierScheduler:
             await asyncio.sleep(self._check_interval_seconds)
 
     async def check_once(self) -> None:
+        try:
+            handles = fetch_handles(self._google_doc_id)
+        except SourcesError as exc:
+            self._logger.error("Failed to load sources: %s", exc)
+            return
+
+        self._logger.info("Loaded %s source(s): %s", len(handles), ", ".join(handles))
         state = self._storage.load()
-        if state.last_post_id:
-            self._seen_post_ids.add(state.last_post_id)
+        updated = False
 
-        try:
-            post = await self._twitter_client.fetch_latest_post()
-        except Exception as exc:  # noqa: BLE001
-            self._logger.error("Failed to fetch latest post: %s", exc)
-            return
+        for handle in handles:
+            try:
+                post = await self._twitter_client.fetch_latest_post(handle)
+            except Exception as exc:  # noqa: BLE001
+                self._logger.error("Failed to fetch latest post for @%s: %s", handle, exc)
+                continue
 
-        if post.post_id in self._seen_post_ids:
-            self._logger.info("No new post.")
-            return
+            last_id = state.last_id_for(handle)
+            if last_id is None:
+                self._logger.info("Baselining @%s at %s", handle, post.post_id)
+                state = state.with_last_id(handle, post.post_id)
+                self._storage.save(state)
+                updated = True
+                continue
 
-        self._logger.info("New post detected")
+            if last_id == post.post_id:
+                self._logger.info("No new post for @%s.", handle)
+                continue
 
-        try:
-            await retry_async(
-                lambda: asyncio.to_thread(
-                    self._discord_client.send_post, post, self._logger
-                ),
-                3,
-                self._logger,
-            )
-            self._seen_post_ids.add(post.post_id)
-            self._storage.save(StoredState(last_post_id=post.post_id))
+            self._logger.info("New post detected for @%s: %s", handle, post.post_id)
+            try:
+                await retry_async(
+                    lambda current=post: asyncio.to_thread(
+                        self._discord_client.send_post, current, self._logger
+                    ),
+                    3,
+                    self._logger,
+                )
+                state = state.with_last_id(handle, post.post_id)
+                self._storage.save(state)
+                updated = True
+            except Exception as exc:  # noqa: BLE001
+                self._logger.error(
+                    "Failed to process new post for @%s: %s", handle, exc
+                )
+
+        if updated:
             self._logger.info("Updated last_post.json")
             await self._persist_state_to_git()
-        except Exception as exc:  # noqa: BLE001
-            self._logger.error("Failed to process new post: %s", exc)
 
     async def _persist_state_to_git(self) -> None:
         if not self._is_git_repo():

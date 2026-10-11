@@ -57,7 +57,9 @@ class TwitterClient:
             viewport_height=1600,
         )
 
-    async def fetch_latest_post(self) -> Post:
+    async def fetch_latest_post(self, username: str | None = None) -> Post:
+        if username:
+            self._username = username.lstrip("@")
         last_error: Exception | None = None
         prefer_fallback = os.getenv("GITHUB_ACTIONS", "").strip().lower() == "true"
         # Guest X pages are blocked from GitHub-hosted runners; Playwright

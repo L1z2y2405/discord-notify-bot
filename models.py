@@ -17,4 +17,12 @@ class Post:
 
 @dataclass(frozen=True, slots=True)
 class StoredState:
-    last_post_id: str | None
+    last_post_ids: dict[str, str] = field(default_factory=dict)
+
+    def last_id_for(self, handle: str) -> str | None:
+        return self.last_post_ids.get(handle.lstrip("@").lower())
+
+    def with_last_id(self, handle: str, post_id: str) -> "StoredState":
+        updated = dict(self.last_post_ids)
+        updated[handle.lstrip("@").lower()] = post_id
+        return StoredState(last_post_ids=updated)

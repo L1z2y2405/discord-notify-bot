@@ -19,6 +19,7 @@ py-modules = [
     "discord_webhook",
     "models",
     "scheduler",
+    "sources",
     "storage",
     "twitter",
     "utils",

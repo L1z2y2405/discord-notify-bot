@@ -50,8 +50,6 @@ class DiscordClient:
 
     def _build_payload(self, post: Post) -> dict[str, Any]:
         embed: dict[str, Any] = {
-            "title": "New Escape from Tarkov Post",
-            "description": post.text or "(no text)",
             "fields": [
                 {"name": "Link", "value": post.post_url, "inline": False},
             ],

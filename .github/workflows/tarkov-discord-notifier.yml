@@ -45,8 +45,8 @@ jobs:
       - name: Run notifier once
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          CHECK_INTERVAL_SECONDS: "300"
-          TWITTER_USERNAME: "tarkov"
+          CHECK_INTERVAL_SECONDS: "600"
+          GOOGLE_DOC_ID: "1l_zDCeJY0KAOoD6K9xzCEY6x9ALHKR1G_CBz3O_Gopc"
           GITHUB_REF_NAME: ${{ github.ref_name }}
           HEADLESS: "true"
           RETRY_ATTEMPTS: "3"

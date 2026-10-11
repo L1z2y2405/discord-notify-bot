@@ -1,14 +1,14 @@
 # tarkov-discord-notifier
 
-Polls the official Escape from Tarkov X account and forwards any new post to a Discord channel via webhook.
+Polls X accounts listed in a shared Google Doc and forwards new posts to Discord via webhook.
 
 ## Features
 
-- Prefers the official X page first.
-- Falls back to public mirror sources if X is blocked or changes markup.
-- Persists the last processed post ID.
-- Uses Playwright with Chromium headless.
-- Sends Discord embeds.
+- Reads source profile links from a Google Doc (one URL per line).
+- Team can add or remove accounts by editing the Doc — no code change.
+- Stores the last seen post ID per account.
+- Prefers the official X page locally; on GitHub Actions uses the public X mirror.
+- Discord embed is link + image only (no title or tweet text).
 - Fully modular and testable.
 
 ## Requirements
@@ -25,7 +25,7 @@ playwright install
 cp .env.example .env
 ```
 
-Set `DISCORD_WEBHOOK_URL` in `.env` before running.
+Set `DISCORD_WEBHOOK_URL` in `.env` before running. Keep the Google Doc shared as **Anyone with the link → Viewer**.
 
 ## Run
 
@@ -33,20 +33,34 @@ Set `DISCORD_WEBHOOK_URL` in `.env` before running.
 python app.py
 ```
 
-## Automation
+## Source list (Google Doc)
 
-GitHub's own `schedule` cron is not used. A Cloudflare Worker in `cloudflare-cron/` fires every hour and calls `workflow_dispatch` on `.github/workflows/tarkov-discord-notifier.yml`.
+The notifier exports:
 
-That avoids GitHub Actions scheduler delay (runs can otherwise sit in queue for hours). The workflow still does the crawl, Discord notify, and `data/last_post.json` commit.
+`https://docs.google.com/document/d/<GOOGLE_DOC_ID>/export?format=txt`
+
+Each non-empty line should be an X profile URL, for example:
 
 ```text
-Cloudflare Cron (0 * * * *)
+https://x.com/tarkov
+https://x.com/tarkovarena
+https://x.com/Paimon2theMoon
+```
+
+Order in the Doc is the send order when several accounts post in the same crawl window. A newly added account is baselined (current latest ID is saved, no Discord ping) so old posts are not dumped.
+
+## Automation
+
+GitHub's own `schedule` cron is not used. A Cloudflare Worker in `cloudflare-cron/` fires every 10 minutes and calls `workflow_dispatch` on `.github/workflows/tarkov-discord-notifier.yml`.
+
+```text
+Cloudflare Cron (*/10 * * * *)
         │
         ▼
   workflow_dispatch
         │
         ▼
-GitHub Actions (uv + Playwright)
+GitHub Actions (read Google Doc + fetch each account)
         │
         ▼
    Discord webhook
@@ -60,14 +74,14 @@ Workflow: `.github/workflows/tarkov-discord-notifier.yml`
 - Checks out the default branch
 - Runs the notifier once and exits
 - Uses `DISCORD_WEBHOOK_URL` from GitHub Secrets
-- Persists `data/last_post.json` back to the repository after a successful notification
+- Persists `data/last_post.json` back to the repository after a successful notification or baseline
 
 Enable the workflow:
 
 1. Push this repository to GitHub.
 2. `Settings` → `Secrets and variables` → `Actions` → add `DISCORD_WEBHOOK_URL`.
 3. Enable Actions for the repository.
-4. Keep the repository public if you want standard GitHub-hosted runner usage to stay free under GitHub's public-repo policy.
+4. Keep the Google Doc world-readable (Viewer).
 5. The workflow needs `contents: write` so it can push the updated post state.
 
 ### Cloudflare Worker
@@ -87,8 +101,8 @@ npx wrangler deploy
 
 `secret put` asks for a value: paste the PAT there. The argument is the secret **name** (`GITHUB_DISPATCH_TOKEN`), not the token itself.
 
-3. Confirm deploy output includes `schedule: 0 * * * *`.
-4. Check the Actions tab within an hour for a `Tarkov Discord Notifier` run triggered by `workflow_dispatch`.
+3. Confirm deploy output includes `schedule: */10 * * * *`.
+4. Check the Actions tab within 10 minutes for a `Tarkov Discord Notifier` run triggered by `workflow_dispatch`.
 
 Worker env (in `wrangler.toml`):
 
@@ -108,8 +122,9 @@ If a cron tick fails, check Worker logs. GitHub should return HTTP `204`. `401` 
 ## Configuration
 
 - `DISCORD_WEBHOOK_URL`: Discord webhook target
-- `CHECK_INTERVAL_SECONDS`: Polling interval in seconds, default `300`
-- `TWITTER_USERNAME`: X username to monitor, default `tarkov`
+- `GOOGLE_DOC_ID` or `GOOGLE_DOC_URL`: Google Doc that lists X profile links
+- `CHECK_INTERVAL_SECONDS`: Local polling interval in seconds, default `600`
+- `TWITTER_USERNAME`: Fallback default handle for the X client
 - `HEADLESS`: `true` or `false`
 - `RETRY_ATTEMPTS`: retry count for transient failures, default `3`
 - `RUN_ONCE`: when `true`, run a single check and exit
@@ -119,7 +134,8 @@ If a cron tick fails, check Worker logs. GitHub should return HTTP `204`. `401` 
 - `app.py`: application entrypoint and dependency wiring
 - `config.py`: environment parsing and settings
 - `models.py`: data models
-- `storage.py`: JSON persistence for the last post ID
+- `sources.py`: Google Doc export and handle parsing
+- `storage.py`: JSON persistence for last post IDs
 - `twitter.py`: X scraping logic and fallback retrieval
 - `discord_webhook.py`: Discord webhook client
 - `scheduler.py`: polling loop and delivery orchestration
@@ -131,12 +147,15 @@ If a cron tick fails, check Worker logs. GitHub should return HTTP `204`. `401` 
 ## Architecture
 
 ```text
+Google Doc (source list)
+        │
+        v
 Cloudflare Cron
-       │
-       v
+        │
+        v
 GitHub Actions workflow
-       │
-       v
+        │
+        v
 ┌──────────────┐
 │   app.py     │
 └──────┬───────┘
@@ -170,13 +189,16 @@ GitHub Actions workflow
 
 ```json
 {
-  "last_post_id": "1234567890"
+    "last_post_ids": {
+        "tarkov": "1234567890",
+        "tarkovarena": "1234567891"
+    }
 }
 ```
 
 ## Notes
 
-- On GitHub Actions, the client prefers the public X mirror first, then falls back to Playwright.
-- Locally, the official X page is attempted first.
-- If scraping fails, the client falls back to public mirrors while preserving the same output format.
-- Duplicate notifications are prevented by comparing the latest post ID with the stored ID.
+- On GitHub Actions, the client uses the public X mirror only.
+- Locally, the official X page is attempted first, then the public mirror.
+- Duplicate notifications are prevented per account by comparing the latest post ID with the stored ID for that handle.
+- If several accounts post in the same 10-minute window, every new post is sent, in Google Doc order.
