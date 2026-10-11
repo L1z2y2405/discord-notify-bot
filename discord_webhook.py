@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Any
 from urllib import error, request
 
@@ -49,13 +48,15 @@ class DiscordClient:
         logger.info("Discord notification sent")
 
     def _build_payload(self, post: Post) -> dict[str, Any]:
-        embed: dict[str, Any] = {
+        first: dict[str, Any] = {
             "fields": [
-                {"name": "Link", "value": post.post_url, "inline": False},
+                {"name": "Source", "value": post.post_url, "inline": False},
             ],
         }
-
         if post.images:
-            embed["image"] = {"url": post.images[0]}
+            first["image"] = {"url": post.images[0]}
 
-        return {"embeds": [embed]}
+        embeds: list[dict[str, Any]] = [first]
+        for image_url in post.images[1:10]:
+            embeds.append({"image": {"url": image_url}})
+        return {"embeds": embeds}

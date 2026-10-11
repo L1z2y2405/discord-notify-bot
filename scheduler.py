@@ -67,6 +67,17 @@ class NotifierScheduler:
                 continue
 
             self._logger.info("New post detected for @%s: %s", handle, post.post_id)
+            if not post.images and not post.has_video:
+                self._logger.info(
+                    "Skipping Discord for @%s (%s): text-only post",
+                    handle,
+                    post.post_id,
+                )
+                state = state.with_last_id(handle, post.post_id)
+                self._storage.save(state)
+                updated = True
+                continue
+
             try:
                 await retry_async(
                     lambda current=post: asyncio.to_thread(

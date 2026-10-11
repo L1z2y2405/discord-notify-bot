@@ -8,7 +8,8 @@ Polls X accounts listed in a shared Google Doc and forwards new posts to Discord
 - Team can add or remove accounts by editing the Doc — no code change.
 - Stores the last seen post ID per account.
 - Prefers the official X page locally; on GitHub Actions uses the public X mirror.
-- Discord embed is link + image only (no title or tweet text).
+- Discord embed is Source + images only (no title or tweet text).
+- Text-only posts are stored but not sent to Discord. Video-only posts are sent.
 - Fully modular and testable.
 
 ## Requirements
@@ -202,3 +203,6 @@ GitHub Actions workflow
 - Locally, the official X page is attempted first, then the public mirror.
 - Duplicate notifications are prevented per account by comparing the latest post ID with the stored ID for that handle.
 - If several accounts post in the same 10-minute window, every new post is sent, in Google Doc order.
+- Posts with no images and no video are recorded in `last_post.json` but not sent to Discord.
+- Posts with only video are sent (`has_video`), using a thumbnail when the mirror provides one.
+- Multiple photos are sent as multiple Discord embeds (one large image each).
